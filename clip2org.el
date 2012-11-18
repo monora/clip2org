@@ -76,7 +76,7 @@ clip2org-include-pdf-folder."
   :group 'clip2org)
 
 (defun clip2org-get-next-book-as-list ()
-  (let (title is-highlight header loc date page start end content)
+  (let (title is-bookmark header loc date page start end content)
     (setq start (point))
     (if (not (re-search-forward "==========" nil t 1))
         ;; Return nil
@@ -86,17 +86,17 @@ clip2org-include-pdf-folder."
       (setq title (buffer-substring-no-properties
                    (line-beginning-position)
                    (line-end-position)))
-      (when (re-search-forward "Highlight" end t 1)
-        (setq is-highlight t))
+      (when (re-search-forward "Lesezeichen" end t 1)
+        (setq is-bookmark t))
       (beginning-of-line)
       (when (re-search-forward "- \\(.*\\)|" end t 1)
         (setq header (match-string 1)))
       (beginning-of-line)
-      (when (re-search-forward "Page \\([0-9-]+\\)" end t 1)
+      (when (re-search-forward "Seite \\([0-9-]+\\)" end t 1)
         (setq page (match-string 1)))
-      (when (re-search-forward "Loc. \\([0-9-]+\\)" end t 1)
+      (when (re-search-forward "Position \\([0-9-]+\\)" end t 1)
         (setq loc (match-string 1)))
-      (when (re-search-forward "Added on \\(.*\\)\n" end t 1)
+      (when (re-search-forward "Hinzugefügt am \\(.*\\)\n" end t 1)
         (setq date (match-string 1)))
       ;; From the end of date to ==========
       (if (re-search-forward
@@ -104,10 +104,12 @@ clip2org-include-pdf-folder."
           (setq content (match-string 1)))
       (when (equal title "==========")
         (error "Clip2org: failed in getting content or quoted text."))
-      (message (format "Clip2org: now processing \"%s\"" title))
+      (message (format "Clip2org: now processing \"%s\" Page: %s Pos: %s"
+                       title page loc
+                       ))
       (forward-line)
       ;; Return list
-      (list title is-highlight page loc date content header))))
+      (list title is-bookmark page loc date content header))))
 
 (defun clip2org-convert-to-org (clist)
   "Process clip2org-alist and generate the output buffer."
@@ -120,30 +122,30 @@ clip2org-include-pdf-folder."
         ;; Process each clipping
         (while (car note-list)
           (let* ((item (car note-list))
-                 (is-highlight (nth 0 item))
+                 (is-bookmark (nth 0 item))
                  (page (nth 1 item))
                  (loc (nth 2 item))
                  (date (nth 3 item))
                  (content (nth 4 item)))
-            (if (not is-highlight)
-                (insert "\n** " content "\n")
+            (when (not is-bookmark)
               (insert "\n** ")
-              (when page
-                (insert "Page " page " "))
-              (when loc
-                (insert "Loc. " loc " "))
-              (insert "\n"))
-            (when clip2org-include-date
-              (insert ":PROPERTIES:\n")
-              (insert ":DATE: " date "\n")
-              (insert ":END:\n\n"))
-            (when is-highlight
-                (insert content "\n"))
+              (when page (insert (format "Seite %3s " page)))
+              (when loc (insert "Position " loc " "))
+              (insert "\n")
+              (let ((x (point)))
+                (insert content "\n")
+                (fill-region x (point))
+                )
+              (when clip2org-include-date
+                (insert ":PROPERTIES:\n")
+                (insert ":DATE: " date "\n")
+                (insert ":END:\n\n"))
               ;; Insert pdf link
               (if (and clip2org-include-pdf-links page)
                   (insert (concat "[[docview:" clip2org-include-pdf-folder
                                   (caar clist) ".pdf"
-                                  "::" page "][View Page]]\n"))))
+                                  "::" page "][View Page]]\n")))
+              ))
           (setq note-list (cdr note-list))))
       ;; Increment to the next book
       (setq clist (cdr clist))))
